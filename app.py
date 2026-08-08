@@ -38,21 +38,28 @@ _load_secrets()
 
 
 def _setup_langsmith() -> bool:
-    """Activate LangSmith tracing if the API key is present.
+    """Activate LangSmith tracing if LANGSMITH_API_KEY is present.
 
-    LangChain reads LANGCHAIN_TRACING_V2 and LANGCHAIN_API_KEY at import
-    time, but also re-checks on first LLM call, so setting them here (after
-    _load_secrets) is sufficient for both local and Streamlit Cloud.
+    The LangSmith SDK reads LANGCHAIN_API_KEY (not LANGSMITH_API_KEY) plus
+    LANGCHAIN_TRACING_V2 and LANGCHAIN_PROJECT.  We always write them
+    unconditionally (not setdefault) so a stale value from a previous run
+    cannot shadow the current key.
 
-    Returns True if tracing is enabled.
+    Returns True if tracing is enabled, False if the key is missing.
     """
-    api_key = os.environ.get("LANGSMITH_API_KEY", "")
+    api_key = (
+        os.environ.get("LANGSMITH_API_KEY")
+        or os.environ.get("LANGCHAIN_API_KEY")   # accept either name
+        or ""
+    )
     if not api_key:
         return False
-    # LangSmith uses LANGCHAIN_API_KEY internally
-    os.environ.setdefault("LANGCHAIN_API_KEY", api_key)
-    os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
-    os.environ.setdefault("LANGCHAIN_PROJECT", "sowbhagya-personal-ai")
+    # LangSmith SDK requires LANGCHAIN_API_KEY — always overwrite so it's fresh
+    os.environ["LANGCHAIN_API_KEY"]      = api_key
+    os.environ["LANGCHAIN_TRACING_V2"]   = "true"
+    os.environ["LANGCHAIN_PROJECT"]      = os.environ.get(
+        "LANGCHAIN_PROJECT", "sowbhagya-personal-ai"
+    )
     return True
 
 _tracing_enabled = _setup_langsmith()

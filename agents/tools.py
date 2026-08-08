@@ -1,13 +1,16 @@
 """
-Tool implementations for virtual-twin agents.
+Tool implementations for Sowbhagya's personal AI.
 Each tool is a LangChain @tool that agents can call during reasoning.
 """
 from __future__ import annotations
 
 import os
+import logging
 from datetime import datetime
 
 from langchain_core.tools import tool
+
+logger = logging.getLogger(__name__)
 
 # ── Lazy vectorstore accessor (loaded once per process) ───────────────────────
 _vectorstore = None
@@ -34,6 +37,64 @@ def _get_vectorstore():
     return _vectorstore
 
 
+def _send_email(subject: str, body: str) -> tuple[bool, str]:
+    """
+    Send an email via SendGrid.
+
+    Returns (success: bool, message: str).
+
+    SendGrid requirement: the from_email address MUST be a verified sender
+    in your SendGrid account (Single Sender Verification or Domain Auth).
+
+    Env vars:
+      SENDGRID_API_KEY   — SendGrid API key (required to send)
+      OWNER_EMAIL        — recipient (your inbox, e.g. sudhirkumar02001@gmail.com)
+      SENDGRID_FROM_EMAIL — verified sender address in SendGrid
+                            Defaults to OWNER_EMAIL if not set.
+                            If OWNER_EMAIL isn't verified in SendGrid, set this
+                            to a dedicated verified address like noreply@yourdomain.com
+    """
+    sendgrid_key = os.environ.get("SENDGRID_API_KEY", "").strip()
+    owner_email  = os.environ.get("OWNER_EMAIL", "sudhirkumar02001@gmail.com").strip()
+    # from_email must be verified in SendGrid — defaults to owner_email but
+    # can be overridden by SENDGRID_FROM_EMAIL for a dedicated verified sender
+    from_email   = os.environ.get("SENDGRID_FROM_EMAIL", owner_email).strip()
+
+    if not sendgrid_key:
+        # No SendGrid key — log locally so it's visible in terminal / Streamlit logs
+        logger.warning("SENDGRID_API_KEY not set — email not sent. Body:\n%s", body)
+        return False, "EMAIL_SKIPPED: no SENDGRID_API_KEY configured"
+
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+
+        msg = Mail(
+            from_email=from_email,
+            to_emails=owner_email,
+            subject=subject,
+            plain_text_content=body,
+        )
+        resp = SendGridAPIClient(sendgrid_key).send(msg)
+        status = resp.status_code
+
+        if status in (200, 202):
+            return True, f"EMAIL_SENT (HTTP {status})"
+        else:
+            # Non-success HTTP — surface the status code
+            err = f"SendGrid returned HTTP {status}"
+            logger.error("Email send failed: %s", err)
+            return False, f"EMAIL_FAILED: {err}"
+
+    except Exception as exc:
+        # Capture the full error message — common causes:
+        #   403 → from_email not verified in SendGrid
+        #   401 → invalid API key
+        err_msg = str(exc)
+        logger.error("Email send exception: %s", err_msg)
+        return False, f"EMAIL_FAILED: {err_msg}"
+
+
 # ── Tool 1: RAG retrieval ──────────────────────────────────────────────────────
 
 @tool
@@ -55,9 +116,8 @@ def retrieve_profile_info(query: str) -> str:
     """
     try:
         vs = _get_vectorstore()
-        results = vs.similarity_search_with_relevance_scores(query, k=3)  # k=3 saves tokens
+        results = vs.similarity_search_with_relevance_scores(query, k=3)
 
-        # Filter chunks below confidence threshold
         relevant = [
             (doc, score)
             for doc, score in results
@@ -101,44 +161,34 @@ def book_meeting(
 
     This sends a notification email to Sowbhagya with the meeting request details.
     """
-    owner_email = os.environ.get("OWNER_EMAIL", "sudhirkumar02001@gmail.com")
-    sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
-
-    summary_lines = [
-        f"📅 New Meeting Request — virtual-twin",
-        f"",
+    subject = f"[Sowbhagya AI] Meeting request from {visitor_name}"
+    body = "\n".join([
+        "📅 New Meeting Request",
+        "",
         f"From:    {visitor_name} ({visitor_email})",
         f"Purpose: {meeting_purpose}",
         f"Time:    {proposed_datetime}",
         f"Sent at: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}",
-    ]
-    body = "\n".join(summary_lines)
+    ])
 
-    if sendgrid_key:
-        try:
-            from sendgrid import SendGridAPIClient
-            from sendgrid.helpers.mail import Mail
+    ok, status_msg = _send_email(subject, body)
 
-            msg = Mail(
-                from_email=owner_email,
-                to_emails=owner_email,
-                subject=f"[virtual-twin] Meeting request from {visitor_name}",
-                plain_text_content=body,
-            )
-            SendGridAPIClient(sendgrid_key).send(msg)
-        except Exception as e:
-            return (
-                f"BOOKING_LOGGED (email failed: {e})\n\n"
-                f"Details: {visitor_name} | {visitor_email} | {proposed_datetime}"
-            )
-
-    return (
-        f"BOOKING_CONFIRMED\n\n"
-        f"Sowbhagya has been notified of your meeting request.\n"
-        f"Visitor: {visitor_name} ({visitor_email})\n"
-        f"Purpose: {meeting_purpose}\n"
-        f"Requested time: {proposed_datetime}"
-    )
+    if ok:
+        return (
+            f"BOOKING_CONFIRMED\n\n"
+            f"I've been notified of your meeting request.\n"
+            f"Visitor: {visitor_name} ({visitor_email})\n"
+            f"Purpose: {meeting_purpose}\n"
+            f"Requested time: {proposed_datetime}"
+        )
+    else:
+        # Still acknowledge the booking even if email failed —
+        # the status_msg surfaces the real error in the LangSmith trace
+        return (
+            f"BOOKING_LOGGED ({status_msg})\n\n"
+            f"Your request has been recorded: {visitor_name} | {visitor_email} | {proposed_datetime}\n"
+            f"Note: email notification encountered an issue — Sowbhagya will follow up directly."
+        )
 
 
 # ── Tool 3: Notify owner of unknown question / direct contact request ─────────
@@ -151,49 +201,35 @@ def notify_owner(
     extra_message: str = "",
 ) -> str:
     """
-    Notify Sowbhagya Mohanthy when a visitor asks a question that is not in the
-    knowledge base, or when a visitor explicitly wants to reach him directly.
+    Notify Sowbhagya Mohanthy when a visitor asks a question not in the knowledge
+    base, or when a visitor explicitly wants to reach him directly.
 
     Call this after collecting visitor_name, visitor_email, and their question.
     extra_message is optional — any additional context the visitor wants to add.
     """
-    owner_email = os.environ.get("OWNER_EMAIL", "sudhirkumar02001@gmail.com")
-    sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
-
+    subject = f"[Sowbhagya AI] Message from {visitor_name}"
     body_lines = [
-        f"🔔 virtual-twin Notification",
-        f"",
-        f"A visitor has a question that could not be answered from your knowledge base.",
-        f"",
+        "🔔 Someone wants to connect",
+        "",
         f"Visitor:  {visitor_name}",
         f"Email:    {visitor_email}",
-        f"Question: {question}",
+        f"Message:  {question}",
     ]
     if extra_message:
         body_lines.append(f"Note:     {extra_message}")
     body_lines.append(f"\nSent at: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}")
     body = "\n".join(body_lines)
 
-    if sendgrid_key:
-        try:
-            from sendgrid import SendGridAPIClient
-            from sendgrid.helpers.mail import Mail
+    ok, status_msg = _send_email(subject, body)
 
-            msg = Mail(
-                from_email=owner_email,
-                to_emails=owner_email,
-                subject=f"[virtual-twin] Question from {visitor_name}",
-                plain_text_content=body,
-            )
-            SendGridAPIClient(sendgrid_key).send(msg)
-        except Exception as e:
-            return (
-                f"NOTIFICATION_LOGGED (email failed: {e})\n\n"
-                f"Details: {visitor_name} | {visitor_email} | {question}"
-            )
-
-    return (
-        f"NOTIFICATION_SENT\n\n"
-        f"Sowbhagya has been notified and will follow up with "
-        f"{visitor_name} at {visitor_email} within 24–48 hours."
-    )
+    if ok:
+        return (
+            f"NOTIFICATION_SENT\n\n"
+            f"I'll follow up with {visitor_name} at {visitor_email} within 24–48 hours."
+        )
+    else:
+        return (
+            f"NOTIFICATION_LOGGED ({status_msg})\n\n"
+            f"Your message has been recorded: {visitor_name} | {visitor_email}\n"
+            f"Note: email notification encountered an issue — I'll still follow up directly."
+        )
