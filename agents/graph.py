@@ -1,21 +1,16 @@
 """
-virtual-twin: Deep LangGraph Multi-Agent Graph
-================================================
+Sowbhagya's Personal AI — LangGraph Multi-Agent Graph
+=======================================================
 Architecture:
   Supervisor (Gemini) — intent classifier
-      ├── RAG Agent        — retrieves from ChromaDB, answers profile questions
+      ├── RAG Agent        — retrieves from ChromaDB, answers as Sowbhagya
       ├── Scheduler Agent  — multi-turn meeting booking flow
-      ├── Notifier Agent   — captures unknown questions, emails Sowbhagya
-      └── Chitchat Agent   — small talk with Sowbhagya's personality
+      ├── Notifier Agent   — captures questions Sowbhagya can't answer here, sends email
+      └── Chitchat Agent   — casual conversation as Sowbhagya
 
 Each sub-agent is a fully autonomous ReAct agent with its own tools and system prompt.
 The Supervisor routes intent and can re-route after each agent turn if needed.
 State is persisted via InMemorySaver (zero-infra, works on Streamlit Cloud).
-
-Model selection (env var GEMINI_MODEL, default gemini-2.0-flash):
-  gemini-2.0-flash-lite  — cheapest, lowest quota (1500 RPD free tier)
-  gemini-2.0-flash       — recommended (1500 RPD, higher RPM)
-  gemini-1.5-flash       — fallback when 2.0 models hit daily quota
 """
 from __future__ import annotations
 
@@ -43,7 +38,7 @@ from agents.tools import retrieve_profile_info, book_meeting, notify_owner
 
 class TwinState(TypedDict):
     """
-    Shared state across all nodes in the virtual-twin graph.
+    Shared state across all nodes in the graph.
 
     messages        : full conversation history (append-only via operator.add)
     next_agent      : which sub-agent the supervisor chose to handle this turn
@@ -313,12 +308,12 @@ def route_after_rag(state: TwinState) -> Literal["notifier_agent", END]:
 
 def build_graph() -> "CompiledGraph":
     """
-    Assembles and compiles the full virtual-twin LangGraph.
+    Assembles and compiles Sowbhagya's personal AI LangGraph.
 
     Graph flow:
       START → supervisor → [rag | scheduler | notifier | chitchat]
-                                  ↓ (if knowledge_gap)
-                              notifier → END
+                                   ↓ (if knowledge_gap)
+                               notifier → END
     """
     builder = StateGraph(TwinState)
 

@@ -33,8 +33,8 @@ CHROMA_DIR = "./chroma_db"
 COLLECTION = "sowbhagya_profile"
 
 
-# ── Additional plain-text knowledge you want in the KB ───────────────────────
-# Any key Q&A, bio text, or facts that are NOT in the PDF can go here.
+# ── Additional plain-text knowledge — written in first person as Sowbhagya ────
+# Any Q&A, bio text, or facts NOT in the PDF can go here.
 
 EXTRA_KNOWLEDGE = """
 Name: Sowbhagya Mohanthy
@@ -44,14 +44,16 @@ Location: Hyderabad, India
 LinkedIn: https://linkedin.com/in/sowbhagya-mohanthy
 HuggingFace: https://huggingface.co/Sowbhagya-45
 Email: sudhirkumar02001@gmail.com
-Phone: +91 93467 05286 (share only if visitor explicitly asks)
+Phone: +91 93467 05286 (share only if person explicitly asks)
 Experience: 3 years at IBM (July 2023 – Present, including internship from Jan 2023)
 
-Current Availability:
-Sowbhagya is open to AI engineering opportunities, consulting conversations, and
-interesting collaboration projects. He is currently employed full-time at IBM.
+About me:
+I'm an AI Engineer and Software Developer at IBM's CIO Agile & Emerging Technologies team
+in Hyderabad. I've been at IBM for 3 years, spending the first 6 months as an intern before
+joining full-time. I'm open to AI engineering opportunities, consulting conversations, and
+interesting collaboration projects while remaining employed at IBM.
 
-Key expertise areas:
+My key expertise:
 - Agentic AI systems: LangGraph, OpenAI Agents SDK, CrewAI, AutoGen, MCP
 - LLM Engineering: IBM Granite, LangChain, RAG, Prompt Engineering
 - AI/ML: UMAP, HDBSCAN, ensemble classifiers, semantic embeddings
@@ -60,17 +62,18 @@ Key expertise areas:
 - Databases: MongoDB, PostgreSQL, Milvus DB, Redis, FAISS
 - DevOps: IBM Cirrus, OpenShift, Docker, CI/CD
 
-Flagship project:
-Recommendation Engine AI (Production) at IBM — a 5-stage automated AI pipeline
-that converts raw enterprise customer feedback into business recommendations,
-deployed on IBM Cirrus/OpenShift. Tech: Python 3.12, FastAPI, IBM Granite,
-UMAP+HDBSCAN semantic clustering, 3-tier ensemble classifier.
+My flagship project:
+I built and led a Recommendation Engine AI system in production at IBM — a 5-stage automated
+AI pipeline that converts raw enterprise customer feedback into actionable business
+recommendations. I conceived the architecture, led the team, and shipped it on IBM Cirrus and
+OpenShift. The stack: Python 3.12, FastAPI, IBM Granite LLM models, UMAP+HDBSCAN semantic
+clustering, and a 3-tier ensemble classifier.
 
-Education:
+My education:
 B.Tech in Computer Science & Engineering | GPA 9.2/10
 Gokaraju Rangaraju Institute of Engineering & Technology, 2019–2023
 
-Certifications:
+My certifications:
 - IBM WatsonX Essentials (2024)
 - IBM Agile Explorer
 - Enterprise Design Thinking Practitioner — IBM
@@ -78,19 +81,25 @@ Certifications:
 - CCNA: Introduction to Networks — Cisco (2022)
 - AWS Academy Cloud Foundations — Amazon Web Services (2021)
 
-Frequently asked questions:
-Q: What is Sowbhagya's notice period?
-A: He is currently employed; notice period would depend on the role and company.
+Questions people ask me:
+Q: What is your notice period?
+A: I'm currently employed at IBM; my notice period would depend on the role and company.
 
-Q: Is Sowbhagya open to remote roles?
-A: Yes, he is open to remote, hybrid, and on-site roles across India.
+Q: Are you open to remote roles?
+A: Yes — I'm open to remote, hybrid, and on-site roles across India.
 
-Q: What kind of roles is Sowbhagya looking for?
-A: AI Engineer, ML Engineer, LLM/Agentic AI specialist, Full-Stack AI Developer roles.
+Q: What kind of roles are you looking for?
+A: AI Engineer, ML Engineer, LLM/Agentic AI specialist, and Full-Stack AI Developer roles.
 
-Q: Does Sowbhagya know LangGraph?
-A: Yes — LangGraph is one of his primary tools. He has hands-on production experience
+Q: Do you know LangGraph?
+A: Yes — LangGraph is one of my primary tools. I have hands-on production experience
    building multi-agent systems, supervisor patterns, and stateful RAG pipelines with it.
+
+Q: Why should I hire you?
+A: I own systems end-to-end — from data ingestion and ML pipelines through backend APIs to
+   React frontends. I've shipped 12+ production systems at IBM including AI pipelines,
+   enterprise chatbots, and MCP servers, all serving real users at scale. My strength is
+   combining deep AI engineering with practical backend and product thinking.
 """
 
 
