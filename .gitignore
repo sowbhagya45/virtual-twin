@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── Project-specific secrets and generated data ───────────────────────────────
+
+# ChromaDB vector store — rebuilt locally by running: uv run python3 ingest.py
+# Never commit: large binary files, machine-specific, regeneratable
+chroma_db/
+
+# Google Calendar OAuth tokens — private credentials, never commit
+token.json
+credentials.json
+
+# Probe / scratch scripts
+_probe_models.py
+cal_setup.py
+.env.example

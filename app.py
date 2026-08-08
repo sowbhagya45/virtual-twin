@@ -615,7 +615,7 @@ def _stream(text: str, delay: float = 0.012):
 _CHIPS = [
     ("🏆 Key skills",   "What are your key skills?"),
     ("🚀 Top project",  "Tell me about your flagship project"),
-    ("📅 Book a call",  "I'd like to schedule a meeting with you"),
+    ("📅 schedule a connect",  "I'd like to schedule a meeting with you"),
     ("📩 Contact",      "I want to reach out to you directly"),
 ]
 
@@ -628,7 +628,7 @@ if not st.session_state.messages:
     st.markdown("## Hey, I'm Sowbhagya 👋")
     st.markdown(
         "Ask me anything about my background, skills, or projects. "
-        "You can also **book a call** with me or leave a message."
+        "You can also **schedule a connect** with me or leave a message."
     )
     st.write("")
 
