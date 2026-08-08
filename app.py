@@ -20,7 +20,8 @@ def _load_secrets():
     """
     _KEYS = (
         "GOOGLE_API_KEY",
-        "SENDGRID_API_KEY",
+        "GMAIL_USER",
+        "GMAIL_APP_PWD",
         "OWNER_EMAIL",
         "LANGSMITH_API_KEY",
         "LANGCHAIN_TRACING_V2",   # must be set before langchain imports

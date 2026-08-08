@@ -6,11 +6,15 @@ from __future__ import annotations
 
 import os
 import logging
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
+
 
 # ── Lazy vectorstore accessor (loaded once per process) ───────────────────────
 _vectorstore = None
@@ -37,62 +41,67 @@ def _get_vectorstore():
     return _vectorstore
 
 
+# ── Email helper — Gmail SMTP (free, no third-party service) ──────────────────
+
 def _send_email(subject: str, body: str) -> tuple[bool, str]:
     """
-    Send an email via SendGrid.
+    Send an email notification via Gmail SMTP using Python's built-in smtplib.
 
-    Returns (success: bool, message: str).
+    Completely free — no SendGrid, no third-party service, no sender verification.
+    Sends directly from your Gmail account using an App Password.
 
-    SendGrid requirement: the from_email address MUST be a verified sender
-    in your SendGrid account (Single Sender Verification or Domain Auth).
+    Required env vars:
+      GMAIL_USER     — your Gmail address  (e.g. sudhirkumar02001@gmail.com)
+      GMAIL_APP_PWD  — 16-char Gmail App Password (NOT your Gmail login password)
 
-    Env vars:
-      SENDGRID_API_KEY   — SendGrid API key (required to send)
-      OWNER_EMAIL        — recipient (your inbox, e.g. sudhirkumar02001@gmail.com)
-      SENDGRID_FROM_EMAIL — verified sender address in SendGrid
-                            Defaults to OWNER_EMAIL if not set.
-                            If OWNER_EMAIL isn't verified in SendGrid, set this
-                            to a dedicated verified address like noreply@yourdomain.com
+    Optional:
+      OWNER_EMAIL    — delivery address for notifications (defaults to GMAIL_USER)
+
+    One-time Gmail setup (2 minutes):
+      1. Enable 2-Step Verification: myaccount.google.com/security
+      2. Generate App Password:      myaccount.google.com/apppasswords
+         → Select app: "Mail"  → Select device: "Other" → name it "personal-ai"
+         → Copy the 16-char password into GMAIL_APP_PWD (spaces don't matter)
+
+    Returns (success: bool, status_message: str).
     """
-    sendgrid_key = os.environ.get("SENDGRID_API_KEY", "").strip()
-    owner_email  = os.environ.get("OWNER_EMAIL", "sudhirkumar02001@gmail.com").strip()
-    # from_email must be verified in SendGrid — defaults to owner_email but
-    # can be overridden by SENDGRID_FROM_EMAIL for a dedicated verified sender
-    from_email   = os.environ.get("SENDGRID_FROM_EMAIL", owner_email).strip()
+    gmail_user  = os.environ.get("GMAIL_USER", "").strip()
+    app_pwd     = os.environ.get("GMAIL_APP_PWD", "").strip()
+    owner_email = os.environ.get("OWNER_EMAIL", gmail_user).strip()
 
-    if not sendgrid_key:
-        # No SendGrid key — log locally so it's visible in terminal / Streamlit logs
-        logger.warning("SENDGRID_API_KEY not set — email not sent. Body:\n%s", body)
-        return False, "EMAIL_SKIPPED: no SENDGRID_API_KEY configured"
+    if not gmail_user or not app_pwd:
+        logger.warning(
+            "GMAIL_USER or GMAIL_APP_PWD not configured — email skipped.\n%s", body
+        )
+        return False, "EMAIL_SKIPPED: set GMAIL_USER and GMAIL_APP_PWD in .env"
 
     try:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = f"Sowbhagya AI <{gmail_user}>"
+        msg["To"]      = owner_email
+        msg.attach(MIMEText(body, "plain"))
 
-        msg = Mail(
-            from_email=from_email,
-            to_emails=owner_email,
-            subject=subject,
-            plain_text_content=body,
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(gmail_user, app_pwd)
+            smtp.sendmail(gmail_user, owner_email, msg.as_string())
+
+        logger.info("Email sent: %s → %s", subject, owner_email)
+        return True, "EMAIL_SENT"
+
+    except smtplib.SMTPAuthenticationError:
+        err = (
+            "Gmail authentication failed. "
+            "GMAIL_APP_PWD must be a 16-char App Password, not your Gmail login. "
+            "Generate one at myaccount.google.com/apppasswords"
         )
-        resp = SendGridAPIClient(sendgrid_key).send(msg)
-        status = resp.status_code
-
-        if status in (200, 202):
-            return True, f"EMAIL_SENT (HTTP {status})"
-        else:
-            # Non-success HTTP — surface the status code
-            err = f"SendGrid returned HTTP {status}"
-            logger.error("Email send failed: %s", err)
-            return False, f"EMAIL_FAILED: {err}"
+        logger.error(err)
+        return False, f"EMAIL_FAILED: {err}"
 
     except Exception as exc:
-        # Capture the full error message — common causes:
-        #   403 → from_email not verified in SendGrid
-        #   401 → invalid API key
-        err_msg = str(exc)
-        logger.error("Email send exception: %s", err_msg)
-        return False, f"EMAIL_FAILED: {err_msg}"
+        err = str(exc)
+        logger.error("Email send exception: %s", err)
+        return False, f"EMAIL_FAILED: {err}"
 
 
 # ── Tool 1: RAG retrieval ──────────────────────────────────────────────────────
@@ -133,7 +142,9 @@ def retrieve_profile_info(query: str) -> str:
         sections = []
         for doc, score in relevant:
             source = doc.metadata.get("source", "resume")
-            sections.append(f"[source: {source} | relevance: {score:.2f}]\n{doc.page_content}")
+            sections.append(
+                f"[source: {source} | relevance: {score:.2f}]\n{doc.page_content}"
+            )
 
         return "\n\n---\n\n".join(sections)
 
@@ -141,7 +152,7 @@ def retrieve_profile_info(query: str) -> str:
         return f"KNOWLEDGE_GAP: Could not retrieve from knowledge base — {e}"
 
 
-# ── Tool 2: Calendar / meeting booking ────────────────────────────────────────
+# ── Tool 2: Meeting booking ────────────────────────────────────────────────────
 
 @tool
 def book_meeting(
@@ -155,11 +166,11 @@ def book_meeting(
 
     Call this after collecting:
     - visitor_name: full name of the visitor
-    - visitor_email: email address to send the calendar invite to
+    - visitor_email: email address of the visitor
     - meeting_purpose: reason for the meeting (job opportunity, collaboration, etc.)
     - proposed_datetime: visitor's preferred date/time string
 
-    This sends a notification email to Sowbhagya with the meeting request details.
+    Sends a notification email to Sowbhagya via Gmail SMTP.
     """
     subject = f"[Sowbhagya AI] Meeting request from {visitor_name}"
     body = "\n".join([
@@ -182,16 +193,14 @@ def book_meeting(
             f"Requested time: {proposed_datetime}"
         )
     else:
-        # Still acknowledge the booking even if email failed —
-        # the status_msg surfaces the real error in the LangSmith trace
         return (
             f"BOOKING_LOGGED ({status_msg})\n\n"
             f"Your request has been recorded: {visitor_name} | {visitor_email} | {proposed_datetime}\n"
-            f"Note: email notification encountered an issue — Sowbhagya will follow up directly."
+            f"I'll follow up with you directly."
         )
 
 
-# ── Tool 3: Notify owner of unknown question / direct contact request ─────────
+# ── Tool 3: Notify owner ───────────────────────────────────────────────────────
 
 @tool
 def notify_owner(
@@ -201,11 +210,13 @@ def notify_owner(
     extra_message: str = "",
 ) -> str:
     """
-    Notify Sowbhagya Mohanthy when a visitor asks a question not in the knowledge
-    base, or when a visitor explicitly wants to reach him directly.
+    Notify Sowbhagya Mohanthy when a visitor wants to reach him directly or asks
+    something outside the knowledge base.
 
     Call this after collecting visitor_name, visitor_email, and their question.
     extra_message is optional — any additional context the visitor wants to add.
+
+    Sends a notification email to Sowbhagya via Gmail SMTP.
     """
     subject = f"[Sowbhagya AI] Message from {visitor_name}"
     body_lines = [
@@ -230,6 +241,5 @@ def notify_owner(
     else:
         return (
             f"NOTIFICATION_LOGGED ({status_msg})\n\n"
-            f"Your message has been recorded: {visitor_name} | {visitor_email}\n"
-            f"Note: email notification encountered an issue — I'll still follow up directly."
+            f"Your message has been recorded. I'll follow up with {visitor_name} directly."
         )
