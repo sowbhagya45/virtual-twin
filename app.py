@@ -13,14 +13,49 @@ from langchain_core.messages import HumanMessage, AIMessage
 load_dotenv()
 
 def _load_secrets():
+    """Bridge Streamlit secrets → os.environ.
+
+    Covers all keys that must be in the environment before any import
+    of agents/ or langchain runs (tracing vars are read at import time).
+    """
+    _KEYS = (
+        "GOOGLE_API_KEY",
+        "SENDGRID_API_KEY",
+        "OWNER_EMAIL",
+        "LANGSMITH_API_KEY",
+        "LANGCHAIN_TRACING_V2",   # must be set before langchain imports
+        "LANGCHAIN_PROJECT",
+        "GEMINI_MODEL",
+    )
     try:
-        for key in ("GOOGLE_API_KEY", "SENDGRID_API_KEY", "OWNER_EMAIL", "LANGSMITH_API_KEY", "GEMINI_MODEL"):
+        for key in _KEYS:
             if key not in os.environ and key in st.secrets:
                 os.environ[key] = st.secrets[key]
     except Exception:
         pass
 
 _load_secrets()
+
+
+def _setup_langsmith() -> bool:
+    """Activate LangSmith tracing if the API key is present.
+
+    LangChain reads LANGCHAIN_TRACING_V2 and LANGCHAIN_API_KEY at import
+    time, but also re-checks on first LLM call, so setting them here (after
+    _load_secrets) is sufficient for both local and Streamlit Cloud.
+
+    Returns True if tracing is enabled.
+    """
+    api_key = os.environ.get("LANGSMITH_API_KEY", "")
+    if not api_key:
+        return False
+    # LangSmith uses LANGCHAIN_API_KEY internally
+    os.environ.setdefault("LANGCHAIN_API_KEY", api_key)
+    os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+    os.environ.setdefault("LANGCHAIN_PROJECT", "sowbhagya-personal-ai")
+    return True
+
+_tracing_enabled = _setup_langsmith()
 
 def _is_quota_error(exc: Exception) -> tuple[bool, int]:
     msg = str(exc)
@@ -647,7 +682,22 @@ if prompt:
                 else AIMessage(content=m["content"])
                 for m in st.session_state.messages
             ]
-            config = {"configurable": {"thread_id": st.session_state.thread_id}}
+            _model_short = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash").replace("models/", "")
+            config = {
+                "configurable": {"thread_id": st.session_state.thread_id},
+                # ── LangSmith trace metadata ──────────────────────────────────
+                # run_name   → top-level run name shown in the trace list
+                # tags       → filterable labels in LangSmith UI
+                # metadata   → key-value pairs visible inside each trace
+                "run_name": f"chat | {prompt[:60]}",
+                "tags": ["sowbhagya-ai", _model_short],
+                "metadata": {
+                    "thread_id":   st.session_state.thread_id,
+                    "model":       _model_short,
+                    "turn":        len(st.session_state.messages),
+                    "user_prompt": prompt[:200],
+                },
+            }
             _NODE = {
                 "supervisor":      ("🧠", "Routing…"),
                 "rag_agent":       ("📚", "Searching knowledge base…"),

@@ -159,7 +159,10 @@ def supervisor_node(state: TwinState) -> dict:
         f"Message: \"{last_human}\"\n"
         f"Reply with ONLY one word: rag_agent | scheduler_agent | notifier_agent | chitchat_agent"
     )
-    response = _llm().invoke([HumanMessage(content=routing_prompt)])
+    response = _llm().invoke(
+        [HumanMessage(content=routing_prompt)],
+        config={"run_name": "supervisor-llm-routing"},
+    )
     raw = _extract_text(response.content).strip().lower()
 
     if "scheduler" in raw:
@@ -185,7 +188,10 @@ def build_rag_agent():
 def rag_node(state: TwinState) -> dict:
     """Runs the RAG ReAct agent and detects knowledge gaps."""
     agent = build_rag_agent()
-    result = agent.invoke({"messages": state["messages"]})
+    result = agent.invoke(
+        {"messages": state["messages"]},
+        config={"run_name": "rag-agent"},
+    )
 
     last_ai = result["messages"][-1]
     response_text = _extract_text(
@@ -222,7 +228,10 @@ def build_scheduler_agent():
 def scheduler_node(state: TwinState) -> dict:
     """Runs the scheduler ReAct agent."""
     agent = build_scheduler_agent()
-    result = agent.invoke({"messages": state["messages"]})
+    result = agent.invoke(
+        {"messages": state["messages"]},
+        config={"run_name": "scheduler-agent"},
+    )
 
     last_ai = result["messages"][-1]
     response_text = _extract_text(
@@ -255,7 +264,10 @@ def build_notifier_agent():
 def notifier_node(state: TwinState) -> dict:
     """Runs the notifier ReAct agent."""
     agent = build_notifier_agent()
-    result = agent.invoke({"messages": state["messages"]})
+    result = agent.invoke(
+        {"messages": state["messages"]},
+        config={"run_name": "notifier-agent"},
+    )
 
     last_ai = result["messages"][-1]
     response_text = _extract_text(
@@ -279,7 +291,10 @@ def notifier_node(state: TwinState) -> dict:
 def chitchat_node(state: TwinState) -> dict:
     """Lightweight personality agent — small talk, no tools, minimal tokens."""
     messages = [SystemMessage(content=CHITCHAT_SYSTEM)] + state["messages"]
-    response = _llm().invoke(messages)
+    response = _llm().invoke(
+        messages,
+        config={"run_name": "chitchat-agent"},
+    )
     return {
         "messages": [AIMessage(content=_extract_text(response.content), name="chitchat_agent")],
         "knowledge_gap": False,
