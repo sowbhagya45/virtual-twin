@@ -707,18 +707,24 @@ if prompt:
                 },
             }
             _NODE = {
-                "supervisor":      ("🧠", "Routing…"),
+                "supervisor":      ("🧠", "Planning…"),
                 "rag_agent":       ("📚", "Searching knowledge base…"),
                 "scheduler_agent": ("📅", "Opening scheduler…"),
-                "notifier_agent":  ("📬", "Preparing notification…"),
+                "notifier_agent":  ("📬", "Sending notification…"),
                 "chitchat_agent":  ("💬", "Composing reply…"),
             }
             _seen: list[str] = []
             _state: dict = {
-                "messages": lc_msgs, "next_agent": "rag_agent",
-                "knowledge_gap": False, "visitor_name": "", "visitor_email": "",
-                "booking_state": {}, "notified": False,
-                "last_agent": st.session_state.last_agent,
+                "messages":      lc_msgs,
+                "plan":          [],
+                "plan_step":     0,
+                "rag_output":    "",
+                "knowledge_gap": False,
+                "visitor_name":  "",
+                "visitor_email": "",
+                "booking_state": {},
+                "notified":      False,
+                "last_agent":    st.session_state.last_agent,
             }
             with _status:
                 for chunk in graph.stream(_state.copy(), config=config, stream_mode="updates"):
@@ -726,7 +732,13 @@ if prompt:
                         if node not in _seen:
                             _seen.append(node)
                             ic, lb = _NODE.get(node, ("⚙️", f"Running {node}…"))
-                            st.write(f"{ic} **{lb}**")
+                            # Show plan after supervisor decides
+                            plan_label = ""
+                            if node == "supervisor" and "plan" in delta:
+                                plan = delta["plan"]
+                                if len(plan) > 1:
+                                    plan_label = f" → `{'` → `'.join(plan)}`"
+                            st.write(f"{ic} **{lb}**{plan_label}")
                         for k, v in delta.items():
                             if k == "messages" and isinstance(v, list):
                                 _state["messages"] = _state["messages"] + v
