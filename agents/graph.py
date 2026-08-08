@@ -76,7 +76,7 @@ class TwinState(TypedDict):
 #
 # Override via GEMINI_MODEL env var or the sidebar model selector in app.py.
 
-_DEFAULT_MODEL = "models/gemini-3.5-flash"
+_DEFAULT_MODEL = "models/gemini-3.5-flash-lite"
 
 
 def _llm() -> ChatGoogleGenerativeAI:

@@ -494,8 +494,8 @@ _MODEL_OPTIONS = {
     "gemini-2.0-flash  [2.0]":          "models/gemini-2.0-flash",
     "gemini-2.0-flash-lite  [2.0]":     "models/gemini-2.0-flash-lite",
 }
-_cur_env   = os.environ.get("GEMINI_MODEL", "models/gemini-3.5-flash")
-_cur_label = next((k for k, v in _MODEL_OPTIONS.items() if v == _cur_env), list(_MODEL_OPTIONS)[0])
+_cur_env   = os.environ.get("GEMINI_MODEL", "models/gemini-3.5-flash-lite")
+_cur_label = next((k for k, v in _MODEL_OPTIONS.items() if v == _cur_env), list(_MODEL_OPTIONS)[1])
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -690,7 +690,7 @@ if prompt:
                 else AIMessage(content=m["content"])
                 for m in st.session_state.messages
             ]
-            _model_short = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash").replace("models/", "")
+            _model_short = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").replace("models/", "")
             config = {
                 "configurable": {"thread_id": st.session_state.thread_id},
                 # ── LangSmith trace metadata ──────────────────────────────────
@@ -751,7 +751,7 @@ if prompt:
             is_quota, wait = _is_quota_error(_err)
             if is_quota:
                 st.session_state["_quota_hit"] = True
-                _cur = os.environ.get("GEMINI_MODEL", "models/gemini-3.5-flash")
+                _cur = os.environ.get("GEMINI_MODEL", "models/gemini-3.5-flash-lite")
                 _rot = ["models/gemini-3.5-flash", "models/gemini-3.5-flash-lite",
                         "models/gemini-3.1-flash-lite", "models/gemini-2.5-flash",
                         "models/gemini-2.0-flash"]
