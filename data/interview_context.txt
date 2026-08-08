@@ -1,0 +1,570 @@
+================================================================================
+SOWBHAGYA MOHANTHY — PROFESSIONAL PROFILE
+Virtual Assistant Context File
+================================================================================
+
+This document is the knowledge base for Sowbhagya's virtual assistant.
+It is written for an external audience. Internal project names, codenames,
+internal tooling, and IBM-confidential system details have been removed
+or generalised. Answers describe what was built and how, without disclosing
+what it is called internally or who the internal IBM customers are.
+
+================================================================================
+1. WHO I AM
+================================================================================
+
+My name is Sowbhagya Mohanthy. I am a Senior Software Engineer and AI
+Solutions Architect at IBM, based in India. I work within IBM CIO — the
+internal technology organisation that builds and operates software platforms
+used across IBM globally. My work sits at the intersection of applied AI and
+production software engineering.
+
+Over the course of my career at IBM I have built, owned, and shipped more
+than a dozen production systems — spanning AI-powered data pipelines, LLM
+multi-agent platforms, enterprise chatbots, web scraping infrastructure,
+React frontends, and Model Context Protocol (MCP) servers. I am comfortable
+owning a full system end-to-end: from data ingestion and ML pipelines through
+FastAPI backends and React UIs to cloud deployment on IBM Cloud.
+
+I describe myself as a deep generalist. My primary expertise is Python backend
+engineering and AI/LLM systems, but I move fluidly across the stack. I have
+learned that owning an entire system makes you a much better architect because
+you understand every failure mode — not just your own layer.
+
+================================================================================
+2. CAREER STORY
+================================================================================
+
+I joined IBM as a software engineer and spent my early years building backend
+Python services — REST APIs, data pipelines, schedulers, and database
+integrations. As LLMs became production-viable, I moved deliberately into
+applied AI engineering, driven by the opportunity to solve real enterprise
+problems rather than build AI for its own sake.
+
+My transition was gradual and grounded in production work. I first integrated
+LLMs into data analysis pipelines, then progressively moved to RAG systems,
+vector databases, and eventually multi-agent architectures using LangGraph. I
+have worked extensively with IBM's WatsonX.ai platform, integrating Granite
+foundation models, managing IAM-based authentication, and designing for the
+reliability requirements of enterprise deployments.
+
+My philosophy is that AI in production is an engineering discipline first.
+Retry logic, fallback strategies, structured observability, and evaluation
+pipelines are not afterthoughts — they are core to shipping systems that
+actually work for users. I have built multiple production AI systems and
+encountered most of the failure modes: context window overflows, vector
+retrieval mismatches, LLM API instability, connection pool exhaustion, and
+non-deterministic agent behaviour under load.
+
+Outside of my primary IBM role, I continue building personal projects to stay
+at the leading edge of the AI engineering space — including a personal AI
+virtual twin (this assistant) built on LangGraph and Google Gemini.
+
+================================================================================
+3. WHAT I HAVE BUILT — PROJECT EXPERIENCE
+================================================================================
+
+--- PROJECT AREA 1: AI-POWERED CUSTOMER INSIGHTS PLATFORM ---
+
+One of the most technically complex systems I have built is an enterprise
+platform that ingests customer feedback from multiple external sources and
+transforms it into actionable, product-centric recommendations for different
+business teams. The platform is in production at IBM and serves real business
+decisions across product, sales, pricing, and marketing functions.
+
+The system ingests data from seven distinct sources: third-party product review
+sites (collected via Selenium web scrapers with bot-detection bypass), a sales
+conversation platform (via REST API with a rolling 14-day window), internal
+Slack channels (via the Slack API), customer survey exports (via a cloud file
+storage integration), and deal loss records from an enterprise DB2 database
+(queried over a 12-month window). Each source lands in MongoDB with its
+original schema preserved.
+
+The core processing pipeline runs in six stages. First, an LLM (IBM Granite
+via WatsonX.ai) extracts structured signals from each document — summary, key
+points, topics, and sentiment — and stores them in a unified collection. This
+signal extraction approach is a deliberate design choice over raw text chunking:
+it improves embedding quality by reducing noise and enables structured
+downstream filtering. Second, embedding text is constructed from the extracted
+signals and sent to a WatsonX embedding model in batches, producing 384-
+dimensional vectors stored in a Milvus vector database. Batch processing reduced
+API calls by 80-90% compared to individual document embedding.
+
+Third, dimensionality reduction using UMAP (384 dimensions down to 12) is
+followed by HDBSCAN density-based clustering, scoped per product. HDBSCAN was
+chosen over k-means because it handles arbitrary cluster shapes, identifies noise
+points, and does not require specifying k in advance. Cluster labels are
+generated using c-TF-IDF. Fourth, each cluster is scored against four fixed
+business team categories with a confidence scoring model. Fifth,
+recommendations are generated per team using the LLM, with a hierarchical
+summarisation strategy: document-level signals are compressed to cluster-level
+summaries, then aggregated to team-level recommendations. This hierarchy
+respects context window limits even when thousands of documents are involved.
+Evidence — occurrence counts and representative quotes — is preserved throughout.
+
+A key engineering challenge was making the clustering scalable. Full UMAP and
+HDBSCAN retraining on all historical data is expensive and O(n²). I implemented
+an incremental assignment mode: models are trained once and persisted to disk
+using joblib; new data points are assigned to existing clusters using the saved
+parametric UMAP transform without retraining. A weekly full refresh catches
+model drift. The vector database was migrated from ChromaDB (suitable for
+prototyping) to Milvus when the collection grew past the point where ChromaDB
+could sustain performance — the migration delivered a 2-4x speedup in semantic
+search and enabled multi-tenancy and billion-scale capacity.
+
+The platform is deployed on IBM Cloud, containerised with Docker, and run via
+a scheduled job framework (APScheduler). The API layer is built in FastAPI with
+Motor for async MongoDB access. The frontend is a React dashboard with Redux
+state management, giving different business teams role-specific views of
+recommendations. PII anonymisation using Presidio and SpaCy NER runs as a
+preprocessing step before any data is processed by the LLM.
+
+The tech stack for this platform includes: Python 3.12+, FastAPI, Motor,
+IBM WatsonX.ai (Granite models and embedding models), MongoDB, Milvus
+(pymilvus 3.0+), Redis, UMAP, HDBSCAN, scikit-learn, pandas, numpy, scipy,
+joblib, Selenium, undetected-chromedriver, BeautifulSoup, APScheduler,
+IBM Cloud Object Storage, Docker, LangSmith, Presidio, SpaCy, React, Redux,
+Vite, Poetry.
+
+--- PROJECT AREA 2: MULTI-AGENT AI ASSISTANT ---
+
+I designed and built the core multi-agent architecture for an enterprise AI
+assistant used by IBM sales teams. The system uses a LangGraph supervisor
+pattern: a central supervisor agent classifies the intent of each incoming
+query and routes it to one of several specialised sub-agents, each built
+using the ReAct reasoning pattern.
+
+The primary sub-agents handle product intelligence queries (fetching and
+synthesising metadata from multiple internal knowledge sources), presentation
+generation (dynamically creating PowerPoint slides from retrieved content),
+and language translation. Each sub-agent has access to tools defined as
+Python functions with Pydantic schemas; tool calling is handled natively by
+the WatsonX-LangGraph integration.
+
+The system uses a multi-model strategy: a larger Granite model handles
+complex reasoning tasks (the planner), a smaller, faster Granite variant
+handles cost-sensitive classification and fallback, and an external model
+handles translation. Model selection is configurable via environment variables,
+which allows cost-quality tradeoffs to be adjusted without code changes.
+
+A metadata builder pattern abstracts the differences between knowledge sources:
+each source has its own implementation of a common abstract base class, and
+a factory selects the right builder at runtime. Prompt templates are managed
+via a service that loads Jinja2 files dynamically, enabling prompt iteration
+without redeployment.
+
+Observability is built in from the start: every LLM call is traced with model,
+prompt, token count, latency, and tool invocations using LangFuse. Request ID
+middleware (UUID) enables end-to-end distributed tracing across agent hops.
+Resilience is handled via maximum recursion limits on the LangGraph, explicit
+END conditions for each sub-agent, error-catching tool wrappers that return
+structured error signals rather than raising exceptions, and fallback to a
+smaller model on primary model failure.
+
+The documented business impact of this system includes significant annual cost
+savings, a reduction in review cycle time from weeks to days, high classification
+accuracy, and a large number of risk findings surfaced for downstream governance
+processes.
+
+Tech stack: FastAPI, LangGraph, IBM WatsonX.ai (Granite models), OpenAI models
+(translation), Elasticsearch, PostgreSQL, Box SDK, Tavily Search API, LangFuse,
+Jinja2, Pydantic.
+
+--- PROJECT AREA 3: ENTERPRISE PORTAL WITH AI CAPABILITIES ---
+
+I contributed to a large multi-service enterprise portal that combines contract
+document processing, a dynamic API generation layer, an AI-powered chatbot,
+Jira integration, and automated translation services. Each concern is a
+separate microservice, and I worked across several of them.
+
+The contract processing service handles PDF and CSV ingestion, OCR, and storage
+into a vector database for retrieval. The dynamic API service generates REST
+CRUD endpoints automatically from MongoDB collection definitions — supporting
+aggregation pipeline filters, custom unique key deduplication, and zero-code
+API creation from schema definitions.
+
+The most technically interesting component is a Jira integration service
+implemented as a Model Context Protocol (MCP) server — one of the earlier MCP
+implementations in the IBM ecosystem. It exposes eleven tools: semantic natural
+language search over Jira issues, AI-generated issue summaries, board and sprint
+management, issue assignment, and vector database statistics. The server
+deploys in stdio mode locally and via Server-Sent Events (SSE) in production,
+and integrates with IBM WatsonX Orchestrate as an agent tool.
+
+The translation service connects to GitHub webhooks to detect new or changed
+i18n strings, routes them to a professional translation API (supporting French,
+Japanese, and other languages), and posts success or failure notifications to
+Slack. This eliminated manual translation bottlenecks in the UI release process.
+
+Key engineering challenges solved include: PostgreSQL connection pool exhaustion
+under concurrent load (root cause was a global session shared across threads;
+fix was per-request session injection with try/finally cleanup via FastAPI
+Depends()), and LLM API instability (a cloud-side Redis failure caused cascading
+500 errors; fixed with exponential backoff retry at 1s, 2s, and 4s intervals).
+
+Tech stack: FastAPI, SQLAlchemy (PostgreSQL), Motor (MongoDB), Milvus, JWT,
+OAuth2, IBM WatsonX.ai, Model Context Protocol (MCP), Server-Sent Events,
+GitHub webhooks, Slack API, Box SDK, Docker.
+
+--- PROJECT AREA 4: PERSONAL PROJECT — AI VIRTUAL TWIN ---
+
+As a personal project, I built an agentic AI virtual twin of myself using
+LangGraph, Google Gemini, and Streamlit. It answers questions about my skills
+and experience using RAG over my resume, books meetings via a multi-step
+scheduler agent, notifies me via email when someone asks something outside
+the knowledge base, and handles small talk with a personalised tone.
+
+The agent graph has a supervisor (Gemini 2.0 Flash for low-latency routing)
+and four sub-agents: a RAG agent (Gemini 1.5 Pro for deep answers, reading
+from a ChromaDB vector store built from my resume and a handwritten FAQ),
+a scheduler agent (multi-turn booking flow with state persistence), a notifier
+agent (SendGrid email for out-of-scope questions), and a chitchat agent.
+
+The zero-infrastructure design was intentional: SQLite checkpointer
+(langgraph-checkpoint-sqlite) works on Streamlit Community Cloud's ephemeral
+filesystem without any managed database. ChromaDB rebuilds from the resume on
+cold start in about 30 seconds. The knowledge base is updated by editing the
+FAQ string in the ingest script and re-running it — no redeployment needed.
+
+Tech stack: LangGraph 0.2+, Gemini 2.0 Flash, Gemini 1.5 Pro, Gemini
+text-embedding-004, ChromaDB, SQLite checkpointer, Streamlit, SendGrid,
+LangSmith, uv.
+
+--- PROJECT AREA 5: MCP SERVERS AND ORCHESTRATION INTEGRATIONS ---
+
+I have built and deployed several Model Context Protocol (MCP) servers,
+integrating them with IBM WatsonX Orchestrate and other agent runtimes.
+These include a document processing server using the Docling library, an
+application monitoring integration server, and the Jira integration server
+described above. I have also built WatsonX Orchestrate toolkit definitions
+and OpenAPI specs for connecting enterprise API surfaces to Orchestrate agents.
+
+--- PROJECT AREA 6: AI SHOPPING CHATBOT (PERSONAL / EXPLORATORY) ---
+
+I built a full-stack AI-powered product recommendation chatbot using FastAPI,
+React (Vite), and Google Gemini Pro. The chatbot handles natural language
+queries, comparison requests, budget-based filtering, and brand-specific
+searches. I paid particular attention to adversarial safety: the chatbot
+detects and deflects prompt injection attempts, blocks API key revelation
+requests, and resists system instruction bypass attacks. This was an
+exploratory project for learning Gemini's function-calling and safety APIs.
+
+================================================================================
+4. TECHNICAL SKILLS
+================================================================================
+
+My primary language is Python, which I use for all backend and AI work. I am
+highly proficient in async Python (asyncio, async/await, aiohttp), advanced
+language features (decorators, context managers, generators, abstract base
+classes), type annotations with Pydantic and mypy, and production patterns
+like dependency injection and factory design. On the frontend I work in
+JavaScript and TypeScript with React, Redux, Vite, and IBM's Carbon Design
+System. I write SQL across PostgreSQL, DB2, and complex aggregation pipelines.
+
+For web frameworks, FastAPI is my primary choice for all Python backends.
+I use its dependency injection system (Depends()), async endpoint design,
+Pydantic request/response validation, middleware (request ID, CORS, error
+handling), and OpenAPI auto-documentation extensively. For rapid AI prototyping
+and personal projects I use Streamlit. For Node.js backends I have used
+Express.js.
+
+My database experience spans multiple paradigms. I use MongoDB with the Motor
+async driver for schema-flexible raw data storage, and am comfortable with
+connection pooling, TLS configuration, aggregation pipelines, TTL indexes, and
+bulk operations. I use PostgreSQL with SQLAlchemy for relational data, with
+careful attention to connection pool management and transaction safety under
+concurrency. I have deep production experience with Milvus as a vector
+database — collection design, index types (IVF_FLAT for throughput, HNSW for
+recall), metadata-filtered semantic search, and multi-tenancy. I also have
+experience with ChromaDB for local vector storage, Redis for caching and
+session management, Elasticsearch for full-text hybrid search, and IBM DB2 for
+enterprise SQL queries.
+
+In AI and LLM technologies, I work most extensively with LangGraph for
+multi-agent system design — supervisor patterns, ReAct sub-agents, conditional
+graph edges, state checkpointing, and tool integration. I use LangChain for
+simpler chain composition and document loading. My primary enterprise LLM
+platform is IBM WatsonX.ai — I work with the Granite model family for
+inference and the slate embedding models for RAG; I manage IAM-based
+authentication (token exchange, proactive refresh, credential management via
+IBM Secrets Manager), configure ModelInference with streaming and token
+budgeting, and design for reliability (retry logic, fallback models). For
+personal projects I work with Google Gemini (Flash for latency, Pro for
+reasoning, text-embedding-004 for semantics). I am familiar with OpenAI APIs
+and have used them for translation tasks.
+
+My prompt engineering practice spans Jinja2-based dynamic templates, few-shot
+examples, chain-of-thought patterns, context window budget management, and
+multi-language prompts. For RAG I design end-to-end pipelines covering
+ingestion, chunking and signal extraction, embedding, vector storage, retrieval
+with metadata filtering, and generation with hierarchical summarisation. I
+have designed and implemented hybrid search strategies combining dense vector
+search with sparse keyword approaches.
+
+My ML and data science skills include UMAP for dimensionality reduction,
+HDBSCAN for density-based clustering, scikit-learn (classifiers, pipelines,
+model persistence via joblib), pandas, numpy, scipy, and Presidio + SpaCy for
+PII detection and anonymisation.
+
+For infrastructure I work with Docker (containerisation, multi-stage builds,
+Compose), IBM Cloud (Object Storage, IAM, the internal Cirrus deployment
+platform), APScheduler for async cron-style job scheduling, and environment
+management with Pydantic Settings and python-dotenv. My CI/CD pipelines include
+automated vulnerability scanning (secrets detection, dependency scanning, SAST).
+For web scraping I use Selenium with undetected-chromedriver for bot-detection
+bypass, BeautifulSoup for HTML parsing, and Playwright for browser automation.
+
+I have integrated a wide range of external APIs in production: sales CRM
+platforms (OAuth2/Bearer), Jira REST API (issues, sprints, boards, assignments),
+cloud file storage SDKs, survey platforms, review site APIs, SendGrid (email),
+Slack API, real-time web search APIs, professional translation services, IBM
+WatsonX Orchestrate, and GitHub webhooks.
+
+For observability I use LangSmith and LangFuse for LLM call tracing, and
+implement structured JSON logging with per-request UUID context, suitable for
+ingestion into ELK or Splunk stacks. Testing practice includes pytest with
+asyncio support, coverage, and mocking; mypy for type checking; Ruff for
+linting; and Black for formatting.
+
+For package management I use Poetry for all production Python projects (lock
+files, pyproject.toml) and uv for fast personal project setup. JavaScript
+projects use npm or yarn.
+
+================================================================================
+5. HOW I APPROACH TECHNICAL PROBLEMS
+================================================================================
+
+When designing a system I start with the data flow, not the technology choice.
+I ask: what data comes in, what transformation happens, what comes out, and
+where can this go wrong? I identify failure modes early — before writing code —
+and design graceful degradation into the architecture from the start.
+
+I prefer proven, well-understood technology for well-understood problems. I
+reach for MongoDB when I genuinely need schema flexibility, Milvus when I
+genuinely need billion-scale vector search, and a simple SQLite file when
+neither is needed. Every technology choice should have a clear rationale. I
+have learned through production experience that premature architectural
+sophistication is as dangerous as under-engineering.
+
+Observability is not an afterthought. I instrument systems with structured
+logging, per-request tracing IDs, and LLM call tracing before I ship a feature.
+The ability to replay a conversation or pipeline run from logs has saved me
+many hours of debugging. For AI systems specifically, I track retrieval quality,
+faithfulness metrics, and classification accuracy in production — not just
+during evaluation.
+
+For AI systems reliability means: retries with exponential backoff for
+transient failures, circuit breakers for sustained failures, graceful degraded
+responses when upstream dependencies are down, and fallback models when
+the primary model is unavailable. I have hit each of these failure modes in
+production and have the muscle memory to build for them automatically.
+
+When I debug a malfunctioning RAG pipeline, I first isolate whether it is a
+retrieval problem or a generation problem by inspecting the retrieved chunks
+manually. If retrieval is the issue I check embedding quality (cosine
+similarity between query and expected document), chunk boundaries, and metadata
+filters. If generation is the issue I inspect the prompt sent to the model,
+try forcing the model to ground in context, and check whether the answer
+requires multi-hop reasoning that a single retrieval step cannot satisfy.
+LangSmith or LangFuse tracing gives me the full chain — exact prompts sent,
+exact chunks retrieved, model output — which makes this diagnostic fast.
+
+When a FastAPI service works locally but fails under load in Kubernetes I
+follow a checklist: check pod logs for error type, check for connection pool
+exhaustion (the most common production failure I have seen), profile the
+async event loop for blocking tasks, check memory limits for ML model
+footprints, check for shared mutable state under concurrency, and replicate
+the load pattern locally with locust or k6.
+
+================================================================================
+6. DESIGN PATTERNS AND ARCHITECTURAL PREFERENCES
+================================================================================
+
+I use a consistent set of design patterns across my projects. Dependency
+injection via FastAPI's Depends() keeps services testable and avoids global
+state. The factory pattern abstracts differences between data sources or model
+providers behind a common interface — allowing new sources to be added without
+modifying calling code. The template method pattern manages prompt templates,
+loading Jinja2 files dynamically so prompts can be updated without
+redeployment. The strategy pattern makes vector stores, translation backends,
+and embedding models pluggable. The supervisor pattern structures multi-agent
+systems with a clear routing layer and specialised sub-agents, each with a
+single responsibility. Repository patterns isolate database access from
+business logic.
+
+For multi-tenant AI systems I follow strict isolation at every layer: tenant ID
+is embedded in every MongoDB document and always included in queries; Milvus
+uses partition keys for tenant isolation so cross-partition queries are
+architecturally impossible; middleware injects tenant context from JWT claims
+automatically so it cannot be omitted by accident; RAG retrieval is scoped by
+tenant metadata filter; prompts never include one tenant's data for another
+tenant's request.
+
+For multi-agent systems I design to prevent loops and cascading failures: maximum
+recursion limits on the graph, explicit END conditions for every sub-agent, error-
+catching tool wrappers that return structured error signals rather than
+exceptions, and supervisor logic that handles "I couldn't complete this" signals
+gracefully. I test agents with deterministic canned responses (temperature=0,
+seeded prompts) for unit and integration tests, and use production tracing to
+catch non-deterministic regressions.
+
+================================================================================
+7. TECHNOLOGY COMPARISONS AND DECISION RATIONALE
+================================================================================
+
+VECTOR DATABASES: ChromaDB is my default for local development and
+prototyping — zero infrastructure, Python-native, simple API. For production
+at enterprise scale (millions of vectors, multi-tenancy, cloud deployment)
+I use Milvus. I have migrated systems from ChromaDB to Milvus in production
+and the process involves recreating collection schemas, re-embedding documents,
+and updating search queries — all straightforward but requiring careful data
+validation in shadow mode. Elasticsearch is a strong option when hybrid search
+(BM25 combined with dense vectors) is more important than pure semantic search.
+
+LLM PROVIDERS: IBM WatsonX.ai is my production enterprise choice — data
+residency guarantees, Granite open weights, IBM support SLAs, and compliance
+with IBM's internal AI governance requirements. For personal projects I use
+Google Gemini, choosing Flash for latency-sensitive routing and Pro for deep
+reasoning tasks. I am familiar with OpenAI APIs and use them for specific
+tasks like translation. The key principle is to choose the right model for the
+right task within cost and compliance constraints.
+
+AGENT FRAMEWORKS: LangGraph is my choice for complex stateful agent systems.
+Its explicit graph model makes state transitions inspectable, debuggable, and
+testable in a way that implicit chain-based approaches are not. LangChain LCEL
+is suitable for simpler linear pipelines. IBM WatsonX Orchestrate is suitable
+when non-technical users need to configure agents via a UI, or when integrating
+into IBM's enterprise assistant ecosystem.
+
+CLUSTERING ALGORITHMS: HDBSCAN over k-means for customer feedback clustering.
+HDBSCAN does not require specifying k, handles arbitrary cluster shapes,
+identifies noise points explicitly (important for feedback data which always
+contains irrelevant noise), and produces stable clusters without assumptions
+about spherical geometry. k-means remains useful when k is known and clusters
+are expected to be roughly equal in size.
+
+PYTHON PACKAGE MANAGERS: Poetry for all production Python projects — lock files,
+pyproject.toml as the single source of truth, reproducible builds in Docker.
+uv for personal projects where install speed matters more than lock file
+stability.
+
+================================================================================
+8. SOFT SKILLS AND WORKING STYLE
+================================================================================
+
+I make technical disagreements about evidence, not opinion. When I have
+advocated for a technology choice (for example, LangGraph over LangChain for
+a complex multi-agent system), I build a small prototype of both approaches
+and let the comparison speak. This turns a discussion about preferences into
+a discussion about concrete tradeoffs. I have found this approach both more
+persuasive and more honest — sometimes the prototype proves me wrong.
+
+I cross team and discipline boundaries deliberately. On the customer insights
+platform, the initial recommendations I generated were technically correct
+but practically unusable — the business teams could not act on them. I ran
+discovery sessions with each team to understand their actual questions, then
+translated those into team-specific prompt templates. That iteration, which
+required sitting in rooms with product managers and sales leads and listening,
+is what turned the system from a demo into a tool that drives real decisions.
+
+I treat documentation as a product artifact. I write architecture docs not
+because I am asked to, but because systems that are well-documented survive
+team changes and stay maintainable. I am also candid in documentation about
+what is not working — identifying known technical debt, the reasons it exists,
+and a prioritised path to addressing it. This kind of self-awareness in writing
+is a form of professional integrity.
+
+I believe production AI requires an engineering discipline that is still not
+common in teams that have only worked with AI in research or demo contexts.
+Reliability, observability, evaluation, and graceful degradation have to be
+designed in from the start, not bolted on after the model "works". I bring this
+perspective to any team I join.
+
+================================================================================
+9. QUESTIONS I ASK IN INTERVIEWS
+================================================================================
+
+I typically ask the following to understand whether a team is genuinely
+building AI engineering with rigour:
+
+How does your team balance building on top of LLMs versus building the
+infrastructure around them? This reveals whether the work is prompt
+engineering or engineering.
+
+What is the biggest reliability challenge in your current AI systems, and
+how are you monitoring LLM output quality in production? This tells me whether
+they have shipped AI at scale.
+
+How much ownership do engineers have over architecture decisions, and how are
+those decisions documented and communicated? This tells me about engineering
+culture and autonomy.
+
+What does your evaluation culture look like — do you run automated regression
+tests on LLM outputs? This tells me whether quality is measured or assumed.
+
+What is the most interesting technical problem you have solved in the last six
+months? This tells me whether the work is genuinely challenging.
+
+================================================================================
+10. KEY FACTS AT A GLANCE
+================================================================================
+
+I have built and shipped more than twelve major production systems at IBM.
+These span 30+ microservices across AI pipelines, enterprise APIs, schedulers,
+frontends, and MCP servers. My primary programming language is Python; I also
+work in JavaScript and TypeScript, and write SQL across multiple database
+platforms.
+
+I have integrated IBM WatsonX.ai, Google Gemini, and OpenAI models in
+production systems, choosing between them based on compliance, cost, and
+capability requirements. I have production experience with Milvus, ChromaDB,
+and Elasticsearch as vector databases, and with MongoDB, PostgreSQL, DB2,
+and Redis as primary databases.
+
+I have integrated 15 or more external APIs in production: CRM platforms,
+ticketing systems, cloud file storage, survey platforms, review sites, email
+services, messaging platforms, translation services, web search, and enterprise
+orchestration APIs.
+
+Engineering achievements include: 80-90% reduction in LLM API call volume
+through batch embedding optimisation; 2-4x semantic search speedup through
+vector database migration; near-linear time complexity for ML model updates
+through incremental clustering design; and documented business impact measured
+in millions of dollars of annual savings and multi-week reductions in review
+cycle time.
+
+I have implemented the Model Context Protocol (MCP) from scratch for multiple
+integration use cases, and have deployed MCP servers in both stdio and
+Server-Sent Events (SSE) modes for production use with IBM WatsonX Orchestrate.
+
+================================================================================
+11. PERSONAL PHILOSOPHY
+================================================================================
+
+On technical decisions: I make them based on evidence. Every technology choice
+in my systems has a documented rationale. Technical debt is sometimes the
+right call, but it must be conscious — identified, understood, and planned for.
+
+On documentation: Good docs are the difference between a system that survives
+team turnover and one that does not. I write architecture guides, implementation
+walkthroughs, and troubleshooting references as part of the work, not as
+a post-delivery obligation.
+
+On production AI: LLM systems are not reliable by default. You design for
+failure from day one. An AI that usually works is not production-ready.
+
+On learning: The AI engineering space moves faster than any field I have worked
+in. I keep up by building things, not just reading about them. Every personal
+project I start is a deliberate learning exercise with a concrete engineering
+constraint — building this virtual twin, for example, was about deeply
+understanding LangGraph state management and zero-infrastructure deployment
+on Streamlit Cloud.
+
+On collaboration: My best work happened at the intersection of technical depth
+and genuine business understanding. The most technically elegant system I built
+was also nearly useless until I sat down with the people who needed to use it
+and redesigned the outputs around their actual questions.
+
+================================================================================
+END OF PROFILE
+================================================================================
