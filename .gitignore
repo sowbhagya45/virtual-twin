@@ -221,7 +221,7 @@ __marimo__/
 
 # ChromaDB vector store — rebuilt locally by running: uv run python3 ingest.py
 # Never commit: large binary files, machine-specific, regeneratable
-chroma_db/
+# chroma_db/ — committed so Streamlit Cloud gets pre-built embeddings (ephemeral FS)
 
 # Google Calendar OAuth tokens — private credentials, never commit
 token.json
