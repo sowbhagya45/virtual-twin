@@ -558,8 +558,9 @@ with st.sidebar:
 
     st.caption("Powered by LangGraph + Gemini")
 
-# ── Sidebar toggle floating button (JS via st.iframe) ─────────────────────────
-st.iframe("""
+# ── Sidebar toggle floating button (JS via components) ────────────────────────
+import streamlit.components.v1 as _components
+_components.html("""
 <script>
 (function() {
     function injectToggleBtn() {
@@ -568,7 +569,6 @@ st.iframe("""
         var btn = root.createElement('button');
         btn.id = '_sb_toggle_fab';
         btn.title = 'Toggle sidebar';
-        // Panel icon SVG — cleaner than ☰
         btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="14" height="14" rx="2" stroke="#a78bfa" stroke-width="1.5"/><line x1="5" y1="1" x2="5" y2="15" stroke="#a78bfa" stroke-width="1.5"/></svg>';
         btn.style.cssText = [
             'position:fixed','top:10px','left:10px','z-index:9999',
@@ -611,7 +611,7 @@ st.iframe("""
     }
 })();
 </script>
-""", height=0)
+""", height=1)
 
 # ── Session state ──────────────────────────────────────────────────────────────
 if "messages"  not in st.session_state: st.session_state.messages  = []
