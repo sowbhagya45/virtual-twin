@@ -531,7 +531,7 @@ with st.sidebar:
     _short = _cur_env.replace("models/", "")
     st.caption(f"🟢 {_short} · active")
     with st.expander("Switch model"):
-        _sel = st.selectbox("", list(_MODEL_OPTIONS.keys()),
+        _sel = st.selectbox("Model", list(_MODEL_OPTIONS.keys()),
                             index=list(_MODEL_OPTIONS.keys()).index(_cur_label),
                             label_visibility="collapsed")
         if _MODEL_OPTIONS[_sel] != _cur_env:
@@ -558,9 +558,8 @@ with st.sidebar:
 
     st.caption("Powered by LangGraph + Gemini")
 
-# ── Sidebar toggle floating button (JS via components) ────────────────────────
-import streamlit.components.v1 as _components
-_components.html("""
+# ── Sidebar toggle floating button (JS via st.iframe) ─────────────────────────
+st.iframe("""
 <script>
 (function() {
     function injectToggleBtn() {
@@ -584,7 +583,6 @@ _components.html("""
             btn.style.background='#374151';
             btn.style.borderColor='#4b5563';
             btn.style.opacity='1';
-            // lighten SVG strokes on hover
             btn.querySelectorAll('rect,line').forEach(function(el){
                 el.setAttribute('stroke','#c4b5fd');
             });
