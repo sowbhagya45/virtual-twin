@@ -29,7 +29,7 @@ _vectorstore = None
 
 
 def _get_vectorstore():
-    """Load ChromaDB vectorstore lazily so it's only built after ingest.py runs."""
+    """Load ChromaDB vectorstore lazily. Validates the collection is non-empty."""
     global _vectorstore
     if _vectorstore is not None:
         return _vectorstore
@@ -41,11 +41,21 @@ def _get_vectorstore():
         model="models/gemini-embedding-001",
         google_api_key=os.environ["GOOGLE_API_KEY"],
     )
-    _vectorstore = Chroma(
+    vs = Chroma(
         persist_directory="./chroma_db",
         embedding_function=embeddings,
         collection_name="sowbhagya_profile",
     )
+    # Validate the collection actually has embeddings — catch silent empty-store failures
+    try:
+        count = vs._collection.count()
+        logger.info(f"ChromaDB loaded: {count} embeddings in 'sowbhagya_profile'")
+        if count == 0:
+            raise RuntimeError("ChromaDB collection is empty — knowledge base missing")
+    except Exception as e:
+        logger.error(f"ChromaDB validation failed: {e}")
+        raise
+    _vectorstore = vs
     return _vectorstore
 
 

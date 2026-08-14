@@ -478,10 +478,26 @@ header[data-testid="stHeader"] {
 # ── Graph bootstrap ────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner="Loading agents…")
 def load_graph():
+    _needs_ingest = False
     if not os.path.exists("./chroma_db"):
+        _needs_ingest = True
+    else:
+        # Validate the persisted store is non-empty before trusting it
+        try:
+            import sqlite3 as _sqlite3
+            _conn = _sqlite3.connect("./chroma_db/chroma.sqlite3")
+            _count = _conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+            _conn.close()
+            if _count == 0:
+                _needs_ingest = True
+        except Exception:
+            _needs_ingest = True
+
+    if _needs_ingest:
         st.toast("Building knowledge base — ~2 min…", icon="⚙️")
         from ingest import ingest
         ingest()
+
     from agents.graph import get_graph
     return get_graph()
 
