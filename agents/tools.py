@@ -236,12 +236,12 @@ def retrieve_profile_info(query: str) -> str:
     """
     try:
         vs = _get_vectorstore()
-        results = vs.similarity_search_with_relevance_scores(query, k=3)
+        results = vs.similarity_search_with_relevance_scores(query, k=8)
 
         relevant = [
             (doc, score)
             for doc, score in results
-            if score >= 0.35
+            if score >= 0.30
         ]
 
         if not relevant:
